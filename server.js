@@ -59,9 +59,10 @@ app.use(
     resave: false,
     saveUninitialized: false,
     cookie: {
-      secure: process.env.NODE_ENV === "production",
-      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
-      maxAge: 8 * 60 * 60 * 1000,
+      httpOnly: false, // Permite que o frontend acesse o cookie se necessário
+      secure: process.env.NODE_ENV === "production", // HTTPS em produção
+      sameSite: "none", // Necessário para cross-domain
+      maxAge: 8 * 60 * 60 * 1000, // 8 horas
     },
   }),
 );
