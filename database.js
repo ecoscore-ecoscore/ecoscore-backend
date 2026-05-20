@@ -160,174 +160,21 @@ async function seed() {
       empresa_id: empresa._id,
     });
     if (!adminExists) {
-      const senha = bcrypt.hashSync("admin123", 10);
+      const senha = bcrypt.hashSync("ecoscoreadmin", 10);
       try {
         await Admin.create({
           usuario: "admin",
           senha: senha,
           empresa_id: empresa._id,
         });
-        console.log("[DB] Admin criado: admin / admin123");
+        console.log("[DB] Admin criado com sucesso");
       } catch (adminErr) {
         if (adminErr.code === 11000) {
-          console.log("[DB] Admin 'admin' já existe para esta empresa");
+          console.log("[DB] Admin já existe para esta empresa");
         } else {
           throw adminErr;
         }
       }
-    }
-
-    // Super Admin
-    const superExists = await Admin.findOne({
-      usuario: "eco_master",
-      empresa_id: null,
-    });
-    if (!superExists) {
-      const senha = bcrypt.hashSync("eco123", 10);
-      await Admin.create({
-        usuario: "eco_master",
-        senha: senha,
-        empresa_id: null,
-      });
-      console.log("[DB] Super Admin criado: eco_master / eco123");
-    }
-
-    // Setores
-    const setoresCount = await Setor.countDocuments({
-      empresa_id: empresa._id,
-    });
-    if (setoresCount === 0) {
-      const senhaSetor = bcrypt.hashSync("ecoscore123", 10);
-      const setoresSeed = [
-        {
-          nome: "Marketing",
-          login: "marketing",
-          dia_semana: 1,
-          empresa_id: empresa._id,
-          senha: senhaSetor,
-        },
-        {
-          nome: "Recursos Humanos",
-          login: "rh",
-          dia_semana: 2,
-          empresa_id: empresa._id,
-          senha: senhaSetor,
-        },
-        {
-          nome: "Produção",
-          login: "producao",
-          dia_semana: 3,
-          empresa_id: empresa._id,
-          senha: senhaSetor,
-        },
-        {
-          nome: "Financeiro",
-          login: "financeiro",
-          dia_semana: 4,
-          empresa_id: empresa._id,
-          senha: senhaSetor,
-        },
-        {
-          nome: "Logística",
-          login: "logistica",
-          dia_semana: 5,
-          empresa_id: empresa._id,
-          senha: senhaSetor,
-        },
-      ];
-      await Setor.insertMany(setoresSeed);
-      console.log("[DB] 5 setores criados.");
-    }
-
-    // Recompensas
-    const recompCount = await Recompensa.countDocuments({
-      empresa_id: empresa._id,
-    });
-    if (recompCount === 0) {
-      const recompensasSeed = [
-        {
-          nome: "Vale Café",
-          descricao: "Vale-café na cantina da empresa",
-          pontuacao_necessaria: 100,
-          tipo: "individual",
-          empresa_id: empresa._id,
-        },
-        {
-          nome: "Folga Extra",
-          descricao: "Um dia de folga adicional",
-          pontuacao_necessaria: 500,
-          tipo: "individual",
-          empresa_id: empresa._id,
-        },
-        {
-          nome: "Brinde EcoScore",
-          descricao: "Kit ecológico personalizado da empresa",
-          pontuacao_necessaria: 300,
-          tipo: "individual",
-          empresa_id: empresa._id,
-        },
-        {
-          nome: "Almoço em Equipe",
-          descricao: "Almoço especial para todo o setor",
-          pontuacao_necessaria: 1000,
-          tipo: "coletiva",
-          empresa_id: empresa._id,
-        },
-        {
-          nome: "Bônus Sustentável",
-          descricao: "Bônus financeiro por desempenho ambiental",
-          pontuacao_necessaria: 2000,
-          tipo: "coletiva",
-          empresa_id: empresa._id,
-        },
-      ];
-      await Recompensa.insertMany(recompensasSeed);
-      console.log("[DB] Recompensas criadas.");
-    }
-
-    // Funcionários
-    const funcCount = await Funcionario.countDocuments({
-      empresa_id: empresa._id,
-    });
-    if (funcCount === 0) {
-      const marketing = await Setor.findOne({
-        login: "marketing",
-        empresa_id: empresa._id,
-      });
-      const rh = await Setor.findOne({ login: "rh", empresa_id: empresa._id });
-      const senhaFunc = bcrypt.hashSync("funcionario123", 10);
-      const funcionariosSeed = [
-        {
-          nome: "Ana Silva",
-          email: "ana@demo.com",
-          senha: senhaFunc,
-          setor_id: marketing._id,
-          empresa_id: empresa._id,
-        },
-        {
-          nome: "Bruno Costa",
-          email: "bruno@demo.com",
-          senha: senhaFunc,
-          setor_id: marketing._id,
-          empresa_id: empresa._id,
-        },
-        {
-          nome: "Carla Mendes",
-          email: "carla@demo.com",
-          senha: senhaFunc,
-          setor_id: rh._id,
-          empresa_id: empresa._id,
-        },
-        {
-          nome: "Diego Santos",
-          email: "diego@demo.com",
-          senha: senhaFunc,
-          setor_id: rh._id,
-          empresa_id: empresa._id,
-        },
-      ];
-      await Funcionario.insertMany(funcionariosSeed);
-      console.log("[DB] Funcionários criados.");
     }
   } catch (err) {
     console.error("[DB SEED ERROR]", err);
