@@ -80,12 +80,12 @@ O servidor estará em `http://localhost:3000`
 
 ## 🔑 Credenciais de Teste
 
-| Tipo          | Usuário             | Senha            | Acesso              |
-| ------------- | ------------------- | ---------------- | ------------------- |
-| Empresa/Admin | `demo@ecoscore.com` | `demo123`        | `/admin.html`       |
-| Setor         | `marketing`         | `ecoscore123`    | `/dashboard.html`   |
-| Funcionário   | `ana@demo.com`      | `funcionario123` | `/user.html`        |
-| Super Admin   | `eco_master`        | `eco123`         | `/super-admin.html` |
+| Tipo          | Usuário                 | Senha            | Acesso              |
+| ------------- | ----------------------- | ---------------- | ------------------- |
+| Empresa/Admin | `ecoscore994@gmail.com` | `ecoscoreadmin`  | `/admin.html`       |
+| Setor         | `marketing`             | `ecoscore123`    | `/dashboard.html`   |
+| Funcionário   | `ana@demo.com`          | `funcionario123` | `/user.html`        |
+| Super Admin   | `eco_master`            | `eco123`         | `/super-admin.html` |
 
 ---
 
