@@ -11,6 +11,12 @@ router.post("/register-company", async (req, res) => {
     return res.status(400).json({ erro: "Todos os campos são obrigatórios" });
   }
 
+  if (senha.length < 6) {
+    return res
+      .status(400)
+      .json({ erro: "Senha deve ter no mínimo 6 caracteres" });
+  }
+
   try {
     const senhaHash = bcrypt.hashSync(senha, 10);
 
@@ -22,7 +28,7 @@ router.post("/register-company", async (req, res) => {
     });
 
     // Criar um admin padrão para esta empresa
-    await Admin.create({
+    const admin = await Admin.create({
       usuario: "admin",
       senha: senhaHash,
       empresa_id: empresa._id,
@@ -30,14 +36,31 @@ router.post("/register-company", async (req, res) => {
 
     res
       .status(201)
-      .json({ sucesso: true, mensagem: "Empresa cadastrada com sucesso" });
+      .json({
+        sucesso: true,
+        mensagem: "Empresa cadastrada com sucesso",
+        empresa_id: empresa._id,
+      });
   } catch (err) {
-    console.error("[AUTH ERROR]", err);
+    console.error("[AUTH ERROR - REGISTER-COMPANY]", err.message, err.code);
+
     if (err.code === 11000) {
-      // MongoDB duplicate key error
-      return res.status(409).json({ erro: "Este e-mail já está cadastrado" });
+      const field = Object.keys(err.keyPattern)[0];
+      if (field === "email") {
+        return res.status(409).json({ erro: "Este e-mail já está cadastrado" });
+      }
+      return res.status(409).json({ erro: `Erro de duplicação: ${field}` });
     }
-    res.status(500).json({ erro: "Erro interno ao cadastrar empresa" });
+
+    if (err.name === "ValidationError") {
+      return res
+        .status(400)
+        .json({ erro: `Erro de validação: ${err.message}` });
+    }
+
+    res
+      .status(500)
+      .json({ erro: "Erro interno ao cadastrar empresa. Tente novamente." });
   }
 });
 
