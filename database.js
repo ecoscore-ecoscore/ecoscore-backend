@@ -174,3 +174,4 @@ mongoose.connection.once('open', seed);
 module.exports = {
   Empresa, Admin, Setor, Funcionario, Coleta, Recompensa, Resgate, mongoose
 };
+//
