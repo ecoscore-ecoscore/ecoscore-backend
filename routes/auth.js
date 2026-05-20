@@ -452,6 +452,85 @@ router.get("/debug/indices", async (req, res) => {
   }
 });
 
+// GET /api/auth/debug/empresas — Listar todas as empresas (debug)
+router.get("/debug/empresas", async (req, res) => {
+  try {
+    const empresas = await Empresa.find().select("_id nome email");
+    const admins = await Admin.find();
+
+    res.json({
+      empresas: empresas.map(e => ({
+        _id: e._id,
+        nome: e.nome,
+        email: e.email,
+        admin: admins.find(a => a.empresa_id?.toString() === e._id.toString())?.usuario || "N/A"
+      })),
+      total: empresas.length,
+      timestamp: new Date().toISOString()
+    });
+  } catch (err) {
+    res.status(500).json({ erro: err.message });
+  }
+});
+
+// ⚠️ POST /api/auth/debug/reset-all-data — APENAS PARA DESENVOLVIMENTO (limpa TUDO e cria novo Super Admin)
+router.post("/debug/reset-all-data", async (req, res) => {
+  if (process.env.NODE_ENV === "production") {
+    return res.status(403).json({ erro: "Operação não permitida em produção" });
+  }
+
+  try {
+    const {
+      Empresa,
+      Admin,
+      Setor,
+      Funcionario,
+      Coleta,
+      Recompensa,
+      Resgate,
+    } = require("../database");
+
+    console.log("[RESET] Deletando todas as coleções...");
+
+    // Delete all
+    await Empresa.deleteMany({});
+    await Admin.deleteMany({});
+    await Setor.deleteMany({});
+    await Funcionario.deleteMany({});
+    await Coleta.deleteMany({});
+    await Recompensa.deleteMany({});
+    await Resgate.deleteMany({});
+
+    console.log("[RESET] Coleções limpas!");
+
+    // Criar novo Super Admin
+    const novoSuperAdmin = bcrypt.hashSync("eco123", 10);
+    const superAdmin = await Admin.create({
+      usuario: "eco_master",
+      senha: novoSuperAdmin,
+      empresa_id: null,
+    });
+
+    console.log("[RESET] Super Admin criado: eco_master / eco123");
+
+    res.json({
+      sucesso: true,
+      mensagem: "Banco de dados resetado com sucesso!",
+      novo_super_admin: {
+        usuario: "eco_master",
+        senha: "eco123",
+        empresa_id: null
+      },
+      timestamp: new Date().toISOString()
+    });
+  } catch (err) {
+    console.error("[RESET ERROR]", err);
+    res.status(500).json({ erro: err.message });
+  }
+});
+
+module.exports = router;
+
 // ⚠️ POST /api/auth/debug/reset-all-data — APENAS PARA DESENVOLVIMENTO (limpa TUDO e cria novo Super Admin)
 router.post("/debug/reset-all-data", async (req, res) => {
   if (process.env.NODE_ENV === "production") {
