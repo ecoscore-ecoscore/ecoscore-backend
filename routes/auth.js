@@ -217,6 +217,68 @@ router.post("/logout", (req, res) => {
   res.json({ sucesso: true });
 });
 
+// POST /api/auth/alterar-senha — Alterar senha do usuário autenticado
+router.post("/alterar-senha", async (req, res) => {
+  const { senhaAtual, novaSenha, confirmarSenha } = req.body;
+
+  // Validação básica
+  if (!senhaAtual || !novaSenha || !confirmarSenha) {
+    return res.status(400).json({ erro: "Todos os campos são obrigatórios" });
+  }
+
+  if (novaSenha !== confirmarSenha) {
+    return res.status(400).json({ erro: "As senhas não conferem" });
+  }
+
+  if (novaSenha.length < 6) {
+    return res
+      .status(400)
+      .json({ erro: "Senha deve ter no mínimo 6 caracteres" });
+  }
+
+  if (novaSenha === senhaAtual) {
+    return res
+      .status(400)
+      .json({ erro: "Nova senha não pode ser igual à atual" });
+  }
+
+  try {
+    // Determinar tipo de usuário e buscar no banco
+    let usuario = null;
+    let model = null;
+
+    if (req.session.admin) {
+      usuario = await Admin.findById(req.session.admin.id);
+      model = "Admin";
+    } else if (req.session.setor) {
+      usuario = await Setor.findById(req.session.setor.id);
+      model = "Setor";
+    } else if (req.session.funcionario) {
+      usuario = await Funcionario.findById(req.session.funcionario.id);
+      model = "Funcionario";
+    }
+
+    if (!usuario) {
+      return res.status(401).json({ erro: "Usuário não autenticado" });
+    }
+
+    // Validar senha atual
+    const senhaValida = bcrypt.compareSync(senhaAtual, usuario.senha);
+    if (!senhaValida) {
+      return res.status(401).json({ erro: "Senha atual incorreta" });
+    }
+
+    // Atualizar senha
+    usuario.senha = bcrypt.hashSync(novaSenha, 10);
+    await usuario.save();
+
+    res.json({ sucesso: true, mensagem: "Senha alterada com sucesso" });
+  } catch (err) {
+    console.error("[AUTH ERROR - ALTERAR-SENHA]", err);
+    res.status(500).json({ erro: "Erro ao alterar senha" });
+  }
+});
+
 // GET /api/auth/test-credentials — Endpoint de teste (apenas desenvolvimento)
 router.get("/test-credentials", (req, res) => {
   res.json({
