@@ -6,6 +6,7 @@ const router = express.Router();
 // POST /api/auth/register-company — Cadastro de nova empresa
 router.post("/register-company", async (req, res) => {
   const { nome, email, senha } = req.body;
+  console.log("[REGISTER-COMPANY] Requisição recebida:", { nome, email });
 
   if (!nome || !email || !senha) {
     return res.status(400).json({ erro: "Todos os campos são obrigatórios" });
@@ -18,31 +19,41 @@ router.post("/register-company", async (req, res) => {
   }
 
   try {
+    console.log("[REGISTER-COMPANY] Hashando senha...");
     const senhaHash = bcrypt.hashSync(senha, 10);
 
+    console.log("[REGISTER-COMPANY] Criando empresa...");
     // Criar empresa
     const empresa = await Empresa.create({
       nome,
       email,
       senha: senhaHash,
     });
+    console.log("[REGISTER-COMPANY] Empresa criada:", empresa._id);
 
     // Criar um admin padrão para esta empresa
+    console.log("[REGISTER-COMPANY] Criando admin padrão...");
     const admin = await Admin.create({
       usuario: "admin",
       senha: senhaHash,
       empresa_id: empresa._id,
     });
+    console.log("[REGISTER-COMPANY] Admin criado:", admin._id);
 
-    res
-      .status(201)
-      .json({
-        sucesso: true,
-        mensagem: "Empresa cadastrada com sucesso",
-        empresa_id: empresa._id,
-      });
+    res.status(201).json({
+      sucesso: true,
+      mensagem: "Empresa cadastrada com sucesso",
+      empresa_id: empresa._id,
+    });
   } catch (err) {
-    console.error("[AUTH ERROR - REGISTER-COMPANY]", err.message, err.code);
+    console.error("[AUTH ERROR - REGISTER-COMPANY]", {
+      message: err.message,
+      code: err.code,
+      stack: process.env.NODE_ENV === "development" ? err.stack : undefined,
+      mongooseValidationErrors: err.errors
+        ? Object.keys(err.errors)
+        : undefined,
+    });
 
     if (err.code === 11000) {
       const field = Object.keys(err.keyPattern)[0];
@@ -312,6 +323,64 @@ router.get("/status", async (req, res) => {
     console.error("[STATUS ERROR]", err);
     res.status(500).json({ status: "erro", erro: err.message });
   }
+});
+
+// GET /api/auth/diagnostico — Endpoint para diagnosticar problemas
+router.get("/diagnostico", async (req, res) => {
+  const info = {
+    timestamp: new Date().toISOString(),
+    node_env: process.env.NODE_ENV,
+    mongodb_uri_configured: !!process.env.MONGODB_URI,
+    conexao_mongodb: "verificando...",
+    colecoes: {},
+    indices: {},
+    erros: [],
+  };
+
+  try {
+    const mongoose = require("mongoose");
+    info.conexao_mongodb =
+      mongoose.connection.readyState === 1
+        ? "conectado"
+        : `desconectado (estado: ${mongoose.connection.readyState})`;
+
+    const db = mongoose.connection.db;
+    if (db) {
+      const colecoes = await db.listCollections().toArray();
+      info.colecoes = colecoes.map((c) => c.name);
+
+      // Verificar índices
+      for (const colecao of colecoes) {
+        const col = db.collection(colecao.name);
+        const indices = await col.getIndexes();
+        info.indices[colecao.name] = Object.keys(indices);
+      }
+    }
+  } catch (err) {
+    info.erros.push({
+      categoria: "MongoDB",
+      mensagem: err.message,
+      stack: process.env.NODE_ENV === "development" ? err.stack : undefined,
+    });
+  }
+
+  // Verificar variáveis de ambiente
+  const envVars = [
+    "MONGODB_URI",
+    "SESSION_SECRET",
+    "FRONTEND_URL",
+    "NODE_ENV",
+    "PORT",
+  ];
+  info.env_vars = {};
+  envVars.forEach((v) => {
+    const val = process.env[v];
+    info.env_vars[v] = val
+      ? `${v[0]}${"*".repeat(Math.max(0, val.length - 4))}${val.slice(-2)}`
+      : "não configurado";
+  });
+
+  res.json(info);
 });
 
 module.exports = router;

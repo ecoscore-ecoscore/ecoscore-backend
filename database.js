@@ -159,12 +159,20 @@ async function seed() {
     });
     if (!adminExists) {
       const senha = bcrypt.hashSync("admin123", 10);
-      await Admin.create({
-        usuario: "admin",
-        senha: senha,
-        empresa_id: empresa._id,
-      });
-      console.log("[DB] Admin criado: admin / admin123");
+      try {
+        await Admin.create({
+          usuario: "admin",
+          senha: senha,
+          empresa_id: empresa._id,
+        });
+        console.log("[DB] Admin criado: admin / admin123");
+      } catch (adminErr) {
+        if (adminErr.code === 11000) {
+          console.log("[DB] Admin 'admin' já existe para esta empresa");
+        } else {
+          throw adminErr;
+        }
+      }
     }
 
     // Super Admin
@@ -324,8 +332,17 @@ async function seed() {
   }
 }
 
-// Rodar seed após conexão (opcional, ou chamar manualmente)
-mongoose.connection.once("open", seed);
+// Rodar seed após conexão apenas se não estiver em teste
+if (process.env.NODE_ENV !== "test") {
+  mongoose.connection.once("open", async () => {
+    try {
+      await seed();
+      console.log("[DB] Seed concluída com sucesso");
+    } catch (seedErr) {
+      console.error("[DB SEED ERROR - FINAL]", seedErr.message);
+    }
+  });
+}
 
 module.exports = {
   Empresa,
@@ -336,5 +353,5 @@ module.exports = {
   Recompensa,
   Resgate,
   mongoose,
+  seed, // Exporta seed para chamadas manuais
 };
-//
