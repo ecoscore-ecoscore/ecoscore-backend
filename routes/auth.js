@@ -459,14 +459,16 @@ router.get("/debug/empresas", async (req, res) => {
     const admins = await Admin.find();
 
     res.json({
-      empresas: empresas.map(e => ({
+      empresas: empresas.map((e) => ({
         _id: e._id,
         nome: e.nome,
         email: e.email,
-        admin: admins.find(a => a.empresa_id?.toString() === e._id.toString())?.usuario || "N/A"
+        admin:
+          admins.find((a) => a.empresa_id?.toString() === e._id.toString())
+            ?.usuario || "N/A",
       })),
       total: empresas.length,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
   } catch (err) {
     res.status(500).json({ erro: err.message });
@@ -519,9 +521,9 @@ router.post("/debug/reset-all-data", async (req, res) => {
       novo_super_admin: {
         usuario: "eco_master",
         senha: "eco123",
-        empresa_id: null
+        empresa_id: null,
       },
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
   } catch (err) {
     console.error("[RESET ERROR]", err);
