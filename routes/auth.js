@@ -285,8 +285,8 @@ router.get("/test-credentials", (req, res) => {
     credenciais: [
       {
         tipo: "Empresa/Admin",
-        usuario: "demo@ecoscore.com",
-        senha: "demo123",
+        usuario: "ecoscore994@gmail.com",
+        senha: "ecoscoreadmin",
         redireciona: "/admin.html",
       },
       {
@@ -330,10 +330,10 @@ router.get("/status", async (req, res) => {
     if (empresaCount === 0) {
       console.log("🔄 Seed manual iniciado...");
 
-      const senhaEmpresa = bcrypt.hashSync("demo123", 10);
+      const senhaEmpresa = bcrypt.hashSync("ecoscoreadmin", 10);
       const empresa = await Empresa.create({
-        nome: "Empresa Demo",
-        email: "demo@ecoscore.com",
+        nome: "EcoScore",
+        email: "ecoscore994@gmail.com",
         senha: senhaEmpresa,
       });
 

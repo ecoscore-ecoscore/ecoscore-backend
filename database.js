@@ -141,15 +141,17 @@ const Resgate = mongoose.model("Resgate", ResgateSchema);
 async function seed() {
   try {
     // Empresa padrão
-    let empresa = await Empresa.findOne({ email: "demo@ecoscore.com" });
+    let empresa = await Empresa.findOne({ email: "ecoscore994@gmail.com" });
     if (!empresa) {
-      const senhaEmpresa = bcrypt.hashSync("demo123", 10);
+      const senhaEmpresa = bcrypt.hashSync("ecoscoreadmin", 10);
       empresa = await Empresa.create({
-        nome: "Empresa Demo",
-        email: "demo@ecoscore.com",
+        nome: "EcoScore",
+        email: "ecoscore994@gmail.com",
         senha: senhaEmpresa,
       });
-      console.log("[DB] Empresa Demo criada.");
+      console.log(
+        "[DB] Empresa EcoScore criada: ecoscore994@gmail.com / ecoscoreadmin",
+      );
     }
 
     // Admin padrão
