@@ -312,6 +312,52 @@ router.get("/test-credentials", (req, res) => {
   });
 });
 
+// POST /api/auth/seed-admin — Criar admin padrão (idempotente)
+router.post("/seed-admin", async (req, res) => {
+  try {
+    const { Empresa, Admin } = require("../database");
+
+    // Criar Empresa se não existir
+    let empresa = await Empresa.findOne({ email: "ecoscore994@gmail.com" });
+    if (!empresa) {
+      const senhaEmpresa = bcrypt.hashSync("ecoscoreadmin", 10);
+      empresa = await Empresa.create({
+        nome: "EcoScore",
+        email: "ecoscore994@gmail.com",
+        senha: senhaEmpresa,
+      });
+      console.log("[SEED-ADMIN] Empresa criada");
+    }
+
+    // Criar Admin se não existir
+    const adminExists = await Admin.findOne({
+      usuario: "admin",
+      empresa_id: empresa._id,
+    });
+    if (!adminExists) {
+      const senhaAdmin = bcrypt.hashSync("ecoscoreadmin", 10);
+      await Admin.create({
+        usuario: "admin",
+        senha: senhaAdmin,
+        empresa_id: empresa._id,
+      });
+      console.log("[SEED-ADMIN] Admin criado");
+    }
+
+    res.json({
+      sucesso: true,
+      mensagem: "Admin cadastrado com sucesso",
+      credenciais: {
+        email: "ecoscore994@gmail.com",
+        senha: "ecoscoreadmin",
+      },
+    });
+  } catch (err) {
+    console.error("[SEED-ADMIN ERROR]", err);
+    res.status(500).json({ erro: err.message });
+  }
+});
+
 // GET /api/auth/status — Verificar status do banco e criar seed se necessário
 router.get("/status", async (req, res) => {
   try {
