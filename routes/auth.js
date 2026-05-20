@@ -49,6 +49,8 @@ router.post("/register-company", async (req, res) => {
     console.error("[AUTH ERROR - REGISTER-COMPANY]", {
       message: err.message,
       code: err.code,
+      keyPattern: err.keyPattern,
+      keyValue: err.keyValue,
       stack: process.env.NODE_ENV === "development" ? err.stack : undefined,
       mongooseValidationErrors: err.errors
         ? Object.keys(err.errors)
@@ -57,10 +59,22 @@ router.post("/register-company", async (req, res) => {
 
     if (err.code === 11000) {
       const field = Object.keys(err.keyPattern)[0];
+      const value = err.keyValue[field];
+
+      console.log(`[DUPLICATE KEY] Campo: ${field}, Valor: ${value}`);
+
       if (field === "email") {
-        return res.status(409).json({ erro: "Este e-mail já está cadastrado" });
+        return res.status(409).json({
+          erro: "Este e-mail já está cadastrado",
+          detalhes: `O e-mail "${value}" já foi registrado no sistema`,
+        });
       }
-      return res.status(409).json({ erro: `Erro de duplicação: ${field}` });
+
+      return res.status(409).json({
+        erro: `Campo "${field}" já existe`,
+        detalhes: `O valor "${value}" já foi registrado no sistema`,
+        campo: field,
+      });
     }
 
     if (err.name === "ValidationError") {
@@ -381,6 +395,117 @@ router.get("/diagnostico", async (req, res) => {
   });
 
   res.json(info);
+});
+
+// GET /api/auth/debug/empresas — Listar todas as empresas (debug)
+router.get("/debug/empresas", async (req, res) => {
+  try {
+    const empresas = await Empresa.find().select("_id nome email");
+    const admins = await Admin.find();
+
+    res.json({
+      empresas: empresas.map((e) => ({
+        _id: e._id,
+        nome: e.nome,
+        email: e.email,
+        admin:
+          admins.find((a) => a.empresa_id?.toString() === e._id.toString())
+            ?.usuario || "N/A",
+      })),
+      total: empresas.length,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (err) {
+    res.status(500).json({ erro: err.message });
+  }
+});
+
+// GET /api/auth/debug/indices — Verificar índices do MongoDB (debug)
+router.get("/debug/indices", async (req, res) => {
+  try {
+    const mongoose = require("mongoose");
+    const db = mongoose.connection.db;
+
+    const indices = {};
+    const collections = ["empresas", "admins"];
+
+    for (const col of collections) {
+      try {
+        const collection = db.collection(col);
+        const idx = await collection.getIndexes();
+        indices[col] = Object.entries(idx).map(([key, val]) => ({
+          nome: key,
+          campos: val.key,
+          unique: val.unique || false,
+        }));
+      } catch (err) {
+        indices[col] = `Erro ao ler: ${err.message}`;
+      }
+    }
+
+    res.json({
+      indices,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (err) {
+    res.status(500).json({ erro: err.message });
+  }
+});
+
+// ⚠️ POST /api/auth/debug/reset-all-data — APENAS PARA DESENVOLVIMENTO (limpa TUDO e cria novo Super Admin)
+router.post("/debug/reset-all-data", async (req, res) => {
+  if (process.env.NODE_ENV === "production") {
+    return res.status(403).json({ erro: "Operação não permitida em produção" });
+  }
+
+  try {
+    const {
+      Empresa,
+      Admin,
+      Setor,
+      Funcionario,
+      Coleta,
+      Recompensa,
+      Resgate,
+    } = require("../database");
+
+    console.log("[RESET] Deletando todas as coleções...");
+
+    // Delete all
+    await Empresa.deleteMany({});
+    await Admin.deleteMany({});
+    await Setor.deleteMany({});
+    await Funcionario.deleteMany({});
+    await Coleta.deleteMany({});
+    await Recompensa.deleteMany({});
+    await Resgate.deleteMany({});
+
+    console.log("[RESET] Coleções limpas!");
+
+    // Criar novo Super Admin
+    const novoSuperAdmin = bcrypt.hashSync("eco123", 10);
+    const superAdmin = await Admin.create({
+      usuario: "eco_master",
+      senha: novoSuperAdmin,
+      empresa_id: null,
+    });
+
+    console.log("[RESET] Super Admin criado: eco_master / eco123");
+
+    res.json({
+      sucesso: true,
+      mensagem: "Banco de dados resetado com sucesso!",
+      novo_super_admin: {
+        usuario: "eco_master",
+        senha: "eco123",
+        empresa_id: null,
+      },
+      timestamp: new Date().toISOString(),
+    });
+  } catch (err) {
+    console.error("[RESET ERROR]", err);
+    res.status(500).json({ erro: err.message });
+  }
 });
 
 module.exports = router;
