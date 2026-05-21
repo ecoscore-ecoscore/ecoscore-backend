@@ -2,13 +2,40 @@ const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
 require("dotenv").config();
 
-const MONGODB_URI =
-  process.env.MONGODB_URI || "mongodb://localhost:27017/ecoscore";
+// Configurações de conexão
+const MONGODB_URI = process.env.MONGODB_URI;
+
+if (!MONGODB_URI) {
+  console.error("❌ ERRO: Variável de ambiente MONGODB_URI não configurada!");
+  console.log("👉 Certifique-se de configurar MONGODB_URI no seu arquivo .env ou no painel da Vercel.");
+}
+
+// Opções de conexão recomendadas para MongoDB Atlas + Serverless
+const connectionOptions = {
+  serverSelectionTimeoutMS: 5000, // Timeout após 5s se não encontrar servidor
+  socketTimeoutMS: 45000, // Fecha sockets inativos após 45s
+};
+
+console.log("🔄 Tentando conectar ao MongoDB...");
+if (MONGODB_URI) {
+  const maskedUri = MONGODB_URI.replace(/\/\/.*@/, "//*****:*****@").split('?')[0];
+  console.log(`📡 URI: ${maskedUri}`);
+}
 
 mongoose
-  .connect(MONGODB_URI)
-  .then(() => console.log("✅ Conectado ao MongoDB"))
-  .catch((err) => console.error("❌ Erro ao conectar ao MongoDB:", err));
+  .connect(MONGODB_URI || "mongodb+srv://ecoscore994_db_user:rRW1AeLn6tpShP0i@ecoscore.bmqnwxt.mongodb.net/ecoscore?retryWrites=true&w=majority", connectionOptions)
+  .then(() => {
+    const estado = mongoose.connection.readyState;
+    const estados = ["desconectado", "conectado", "conectando", "desconectando"];
+    console.log(`✅ MongoDB Status: ${estados[estado]} (Pronto para operações)`);
+  })
+  .catch((err) => {
+    console.error("❌ Erro fatal na conexão MongoDB:");
+    console.error(`   Mensagem: ${err.message}`);
+    if (err.message.includes("ETIMEOUT")) {
+      console.error("   Dica: Verifique se o IP da Vercel está liberado no Network Access do Atlas (0.0.0.0/0).");
+    }
+  });
 
 // ─── Schemas ──────────────────────────────────────────────────────────────────
 
