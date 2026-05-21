@@ -49,6 +49,7 @@ app.use(express.static(path.join(__dirname, "public")));
 
 const MongoStore = require("connect-mongo");
 const mongoose = require("mongoose");
+const dbModule = require("./database");
 
 app.set("trust proxy", 1); 
 
@@ -57,11 +58,11 @@ app.use(async (req, res, next) => {
   if (req.path.startsWith('/api')) {
     try {
       if (mongoose.connection.readyState !== 1) {
-        console.log("🔄 [DB] Reconectando ao MongoDB antes da requisição...");
-        await require("./database"); // Garante que a lógica de conexão seja executada
+        console.log("🔄 [DB] Garantindo conexão antes da requisição...");
+        await dbModule.connectToDatabase();
       }
     } catch (err) {
-      console.error("❌ [DB] Falha ao garantir conexão:", err.message);
+      console.error("❌ [DB] Falha crítica de conexão:", err.message);
     }
   }
   next();
@@ -70,11 +71,12 @@ app.use(async (req, res, next) => {
 app.use(
   session({
     secret: process.env.SESSION_SECRET || "ecoscore-secret-2026",
-    resave: true,
+    resave: false, // Recomendado para MongoStore
     saveUninitialized: false,
     store: MongoStore.create({
-      mongoUrl: process.env.MONGODB_URI || "mongodb+srv://ecoscore994_db_user:rRW1AeLn6tpShP0i@ecoscore.bmqnwxt.mongodb.net/ecoscore?retryWrites=true&w=majority",
-      touchAfter: 24 * 3600 // Atualiza a sessão apenas uma vez por dia se não houver mudanças
+      client: mongoose.connection.getClient(), // REUSA a conexão do Mongoose
+      dbName: "ecoscore",
+      touchAfter: 24 * 3600
     }),
     cookie: {
       httpOnly: true,
