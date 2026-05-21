@@ -52,14 +52,16 @@ const mongoose = require("mongoose");
 
 app.set("trust proxy", 1); 
 
-// Middleware para verificar se o banco está pronto antes de processar APIs
-app.use((req, res, next) => {
-  if (req.path.startsWith('/api') && !['/api/auth/diagnostico', '/api/auth/status', '/api/auth/seed-admin'].includes(req.path)) {
-    if (mongoose.connection.readyState !== 1) {
-      return res.status(503).json({ 
-        erro: "Banco de dados em processo de conexão ou desconectado.",
-        status: mongoose.connection.readyState 
-      });
+// Middleware para garantir conexão com o banco em ambientes serverless
+app.use(async (req, res, next) => {
+  if (req.path.startsWith('/api')) {
+    try {
+      if (mongoose.connection.readyState !== 1) {
+        console.log("🔄 [DB] Reconectando ao MongoDB antes da requisição...");
+        await require("./database"); // Garante que a lógica de conexão seja executada
+      }
+    } catch (err) {
+      console.error("❌ [DB] Falha ao garantir conexão:", err.message);
     }
   }
   next();

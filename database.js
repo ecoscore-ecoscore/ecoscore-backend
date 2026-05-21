@@ -12,30 +12,36 @@ if (!MONGODB_URI) {
 
 // Opções de conexão recomendadas para MongoDB Atlas + Serverless
 const connectionOptions = {
-  serverSelectionTimeoutMS: 5000, // Timeout após 5s se não encontrar servidor
-  socketTimeoutMS: 45000, // Fecha sockets inativos após 45s
+  serverSelectionTimeoutMS: 10000, 
+  socketTimeoutMS: 45000,
+  maxPoolSize: 1, // Reduz o número de conexões em ambiente serverless
 };
 
-console.log("🔄 Tentando conectar ao MongoDB...");
-if (MONGODB_URI) {
-  const maskedUri = MONGODB_URI.replace(/\/\/.*@/, "//*****:*****@").split('?')[0];
-  console.log(`📡 URI: ${maskedUri}`);
+let cachedDb = null;
+
+async function connectToDatabase() {
+  if (mongoose.connection.readyState === 1) {
+    return mongoose.connection;
+  }
+
+  if (cachedDb) {
+    return cachedDb;
+  }
+
+  console.log("🔄 Tentando conectar ao MongoDB...");
+  try {
+    const db = await mongoose.connect(MONGODB_URI || "mongodb+srv://ecoscore994_db_user:rRW1AeLn6tpShP0i@ecoscore.bmqnwxt.mongodb.net/ecoscore?retryWrites=true&w=majority", connectionOptions);
+    cachedDb = db;
+    console.log("✅ MongoDB Conectado!");
+    return db;
+  } catch (err) {
+    console.error("❌ Erro fatal na conexão MongoDB:", err.message);
+    throw err;
+  }
 }
 
-mongoose
-  .connect(MONGODB_URI || "mongodb+srv://ecoscore994_db_user:rRW1AeLn6tpShP0i@ecoscore.bmqnwxt.mongodb.net/ecoscore?retryWrites=true&w=majority", connectionOptions)
-  .then(() => {
-    const estado = mongoose.connection.readyState;
-    const estados = ["desconectado", "conectado", "conectando", "desconectando"];
-    console.log(`✅ MongoDB Status: ${estados[estado]} (Pronto para operações)`);
-  })
-  .catch((err) => {
-    console.error("❌ Erro fatal na conexão MongoDB:");
-    console.error(`   Mensagem: ${err.message}`);
-    if (err.message.includes("ETIMEOUT")) {
-      console.error("   Dica: Verifique se o IP da Vercel está liberado no Network Access do Atlas (0.0.0.0/0).");
-    }
-  });
+// Inicia a conexão imediatamente
+connectToDatabase();
 
 // ─── Schemas ──────────────────────────────────────────────────────────────────
 
@@ -253,6 +259,7 @@ if (process.env.NODE_ENV !== "test") {
 }
 
 module.exports = {
+  connectToDatabase,
   Empresa,
   Admin,
   Setor,
@@ -261,5 +268,5 @@ module.exports = {
   Recompensa,
   Resgate,
   mongoose,
-  seed, // Exporta seed para chamadas manuais
+  seed,
 };
