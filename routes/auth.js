@@ -103,7 +103,7 @@ router.post("/login", async (req, res) => {
     const superAdmin = await Admin.findOne({
       usuario: login,
       empresa_id: null,
-    }).timeout(5000);
+    }).maxTimeMS(5000);
     
     if (superAdmin && bcrypt.compareSync(senha, superAdmin.senha)) {
       console.log("[LOGIN] Super Admin identificado.");
@@ -128,7 +128,7 @@ router.post("/login", async (req, res) => {
 
     // 1. Tentar como Empresa/Admin (E-mail)
     console.log("[LOGIN] Buscando Empresa...");
-    const empresa = await Empresa.findOne({ email: login }).timeout(5000);
+    const empresa = await Empresa.findOne({ email: login }).maxTimeMS(5000);
     if (empresa && bcrypt.compareSync(senha, empresa.senha)) {
       console.log("[LOGIN] Empresa/Admin identificada.");
       const admin = await Admin.findOne({ empresa_id: empresa._id });
@@ -150,7 +150,7 @@ router.post("/login", async (req, res) => {
 
     // 2. Tentar como Setor (Login)
     console.log("[LOGIN] Buscando Setor...");
-    const setor = await Setor.findOne({ login: login, ativo: 1 }).timeout(5000);
+    const setor = await Setor.findOne({ login: login, ativo: 1 }).maxTimeMS(5000);
     if (setor && bcrypt.compareSync(senha, setor.senha)) {
       console.log("[LOGIN] Setor identificado.");
       req.session.setor = {
@@ -172,7 +172,7 @@ router.post("/login", async (req, res) => {
 
     // 3. Tentar como Funcionário (E-mail)
     console.log("[LOGIN] Buscando Funcionário...");
-    const func = await Funcionario.findOne({ email: login, ativo: 1 }).populate("setor_id").timeout(5000);
+    const func = await Funcionario.findOne({ email: login, ativo: 1 }).populate("setor_id").maxTimeMS(5000);
     if (func && bcrypt.compareSync(senha, func.senha)) {
       console.log("[LOGIN] Funcionário identificado.");
       req.session.funcionario = {

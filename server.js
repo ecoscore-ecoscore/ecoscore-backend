@@ -2,19 +2,16 @@ const express = require("express");
 const session = require("express-session");
 const path = require("path");
 const cors = require("cors");
+const MongoStore = require("connect-mongo");
+const mongoose = require("mongoose");
 require("dotenv").config();
 
-// Inicializa banco
-require("./database");
+const dbModule = require("./database");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Debug
-console.log("🔧 NODE_ENV:", process.env.NODE_ENV);
-console.log("🔧 FRONTEND_URL:", process.env.FRONTEND_URL);
-
-// ─── Middlewares ──────────────────────────────────────────────────────────────
+// Configurações de CORS ultra-permitivas para Vercel
 const allowedOrigins = [
   process.env.FRONTEND_URL,
   "http://localhost:5000",
@@ -27,11 +24,17 @@ const allowedOrigins = [
 app.use(
   cors({
     origin: function (origin, callback) {
-      // Permite requests sem origin (como mobile apps ou curl)
+      // Permitir requests sem origin (como mobile apps ou curl)
       if (!origin) return callback(null, true);
-      if (allowedOrigins.indexOf(origin) !== -1 || origin.includes("vercel.app")) {
+      
+      // Permitir qualquer subdomínio vercel.app ou origins permitidas
+      const isVercel = origin.endsWith(".vercel.app");
+      const isAllowed = allowedOrigins.indexOf(origin) !== -1;
+      
+      if (isVercel || isAllowed) {
         callback(null, true);
       } else {
+        console.warn(`[CORS] Bloqueado: ${origin}`);
         callback(new Error("Not allowed by CORS"));
       }
     },
@@ -44,70 +47,50 @@ app.use(
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Serve arquivos estáticos apenas se ainda estiverem no mesmo projeto
-app.use(express.static(path.join(__dirname, "public")));
-
-const MongoStore = require("connect-mongo");
-const mongoose = require("mongoose");
-const dbModule = require("./database");
-
 app.set("trust proxy", 1); 
 
-// Middleware para garantir conexão com o banco em ambientes serverless
-app.use(async (req, res, next) => {
-  if (req.path.startsWith('/api')) {
-    try {
-      if (mongoose.connection.readyState !== 1) {
-        console.log("🔄 [DB] Garantindo conexão antes da requisição...");
-        await dbModule.connectToDatabase();
-      }
-    } catch (err) {
-      console.error("❌ [DB] Falha crítica de conexão:", err.message);
-    }
-  }
-  next();
-});
-
+// Configuração da Sessão
 app.use(
   session({
     secret: process.env.SESSION_SECRET || "ecoscore-secret-2026",
-    resave: false, // Recomendado para MongoStore
+    resave: false,
     saveUninitialized: false,
     store: MongoStore.create({
-      client: mongoose.connection.getClient(), // REUSA a conexão do Mongoose
-      dbName: "ecoscore",
-      touchAfter: 24 * 3600
+      mongoUrl: process.env.MONGODB_URI || "mongodb+srv://ecoscore994_db_user:rRW1AeLn6tpShP0i@ecoscore.bmqnwxt.mongodb.net/ecoscore?retryWrites=true&w=majority",
+      ttl: 14 * 24 * 60 * 60,
+      autoRemove: 'native',
+      touchAfter: 3600 // Reduz escritas no banco
     }),
     cookie: {
       httpOnly: true,
       secure: true,
       sameSite: "none",
-      maxAge: 8 * 60 * 60 * 1000,
+      maxAge: 8 * 60 * 60 * 1000, // 8 horas
     },
   }),
 );
 
-// ─── Rotas ────────────────────────────────────────────────────────────────────
+// Middleware para garantir conexão com o banco
+app.use(async (req, res, next) => {
+  if (req.path.startsWith('/api')) {
+    try {
+      if (mongoose.connection.readyState !== 1) {
+        await dbModule.connectToDatabase();
+      }
+    } catch (err) {
+      console.error("❌ [DB ERROR]", err.message);
+    }
+  }
+  next();
+});
+
+// Rotas
 app.use("/api/auth", require("./routes/auth"));
 
-// ─── Rota de sessão atual ─────────────────────────────────────────────────────
 app.get("/api/me", (req, res) => {
-  console.log("🔍 [API/ME] Session ID:", req.sessionID);
-  console.log("🔍 [API/ME] Session Content:", req.session);
-
-  if (req.session.setor) {
-    return res.json({ logado: true, tipo: "setor", ...req.session.setor });
-  }
-  if (req.session.admin) {
-    return res.json({ logado: true, tipo: "admin", ...req.session.admin });
-  }
-  if (req.session.funcionario) {
-    return res.json({
-      logado: true,
-      tipo: "funcionario",
-      ...req.session.funcionario,
-    });
-  }
+  if (req.session.setor) return res.json({ logado: true, tipo: "setor", ...req.session.setor });
+  if (req.session.admin) return res.json({ logado: true, tipo: "admin", ...req.session.admin });
+  if (req.session.funcionario) return res.json({ logado: true, tipo: "funcionario", ...req.session.funcionario });
   res.json({ logado: false });
 });
 
@@ -117,19 +100,16 @@ app.use("/api/recompensas", require("./routes/recompensas"));
 app.use("/api/admin", require("./routes/admin"));
 app.use("/api/super", require("./routes/super"));
 
-// ─── SPA fallback ─────────────────────────────────────────────────────────────
+// Arquivos estáticos
+app.use(express.static(path.join(__dirname, "public")));
+
 app.get("*", (req, res) => {
-  if (req.path.startsWith("/api")) {
-    return res.status(404).json({ erro: "Rota de API não encontrada" });
-  }
+  if (req.path.startsWith("/api")) return res.status(404).json({ erro: "Rota não encontrada" });
   res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
-// ─── Start ────────────────────────────────────────────────────────────────────
 app.listen(PORT, () => {
-  console.log(`\n🌿 EcoScore rodando em http://localhost:${PORT}`);
-  console.log(`   Admin: http://localhost:${PORT}/admin.html`);
-  console.log(`   Login: admin / admin123\n`);
+  console.log(`\n🌿 EcoScore rodando na porta ${PORT}`);
 });
 
-module.exports = app; // Exporta para a Vercel
+module.exports = app;
