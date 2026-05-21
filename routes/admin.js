@@ -205,4 +205,29 @@ router.get('/relatorios', authAdmin, async (req, res) => {
   }
 });
 
+// GET /api/admin/funcionarios/list — Lista simplificada para seleção em coletas (Admin ou Setor)
+router.get('/funcionarios/list', async (req, res) => {
+  const empresa_id = req.session.admin?.empresa_id || req.session.setor?.empresa_id;
+  if (!empresa_id) return res.status(401).json({ erro: 'Não autorizado' });
+
+  try {
+    const { Funcionario } = require('../database');
+    const funcionarios = await Funcionario.find({ empresa_id, ativo: 1 })
+      .select('nome email setor_id')
+      .populate('setor_id', 'nome')
+      .sort('nome');
+      
+    const result = funcionarios.map(f => ({
+      id: f._id,
+      nome: f.nome,
+      email: f.email,
+      setor: f.setor_id ? f.setor_id.nome : 'Sem setor'
+    }));
+    
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ erro: 'Erro ao buscar lista de funcionários' });
+  }
+});
+
 module.exports = router;

@@ -55,15 +55,44 @@ router.post('/empresas', authSuper, async (req, res) => {
   }
 });
 
-// DELETE /api/super/empresas/:id — Remover empresa e seus dados (Cuidado!)
+// DELETE /api/super/empresas/:id — Remover empresa e TODOS os seus dados (Cascata)
 router.delete('/empresas/:id', authSuper, async (req, res) => {
   const { id } = req.params;
+  const { Admin, Setor, Funcionario, Coleta, Recompensa, Resgate } = require('../database');
+  
   try {
-    await Empresa.findByIdAndDelete(id);
-    // Idealmente, deletar dependências aqui também (Setores, Funcionários, etc.)
-    res.json({ sucesso: true });
+    const empresaId = new mongoose.Types.ObjectId(id);
+
+    console.log(`[CASCATA] Iniciando exclusão total da empresa: ${id}`);
+
+    // 1. Deletar todos os dados vinculados
+    const resultados = await Promise.all([
+      Admin.deleteMany({ empresa_id: empresaId }),
+      Setor.deleteMany({ empresa_id: empresaId }),
+      Funcionario.deleteMany({ empresa_id: empresaId }),
+      Coleta.deleteMany({ empresa_id: empresaId }),
+      Recompensa.deleteMany({ empresa_id: empresaId }),
+      Resgate.deleteMany({ empresa_id: empresaId }),
+      Empresa.findByIdAndDelete(id)
+    ]);
+
+    console.log(`[CASCATA] Empresa ${id} e todas as suas dependências foram removidas.`);
+
+    res.json({ 
+      sucesso: true, 
+      mensagem: 'Empresa e todos os registros associados foram excluídos com sucesso.',
+      detalhes: {
+        admins: resultados[0].deletedCount,
+        setores: resultados[1].deletedCount,
+        funcionarios: resultados[2].deletedCount,
+        coletas: resultados[3].deletedCount,
+        recompensas: resultados[4].deletedCount,
+        resgates: resultados[5].deletedCount
+      }
+    });
   } catch (err) {
-    res.status(500).json({ erro: 'Erro ao remover empresa.' });
+    console.error('[DELETE COMPANY ERROR]', err);
+    res.status(500).json({ erro: 'Erro ao realizar a exclusão em cascata da empresa.' });
   }
 });
 
