@@ -77,16 +77,7 @@ router.post('/', authUser, async (req, res) => {
   }
 
   try {
-    // Verificar duplicata (mesmo funcionário, mesmo material, mesmo dia)
     const hoje = new Date().toISOString().split('T')[0];
-    const duplicata = await Coleta.findOne({
-      setor_id, funcionario_nome, tipo_material: materialLower, data_registro: hoje, empresa_id
-    });
-
-    if (duplicata) {
-      return res.status(409).json({ erro: 'Registro duplicado: já existe um registro para este funcionário, material e dia.' });
-    }
-
     const pontos = Math.round(pesoNum * PONTOS_POR_MATERIAL[materialLower]);
 
     const coleta = await Coleta.create({
