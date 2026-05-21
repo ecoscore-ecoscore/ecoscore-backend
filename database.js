@@ -20,12 +20,11 @@ const EmpresaSchema = new mongoose.Schema({
 });
 
 // Middleware para criptografar senha da empresa
-EmpresaSchema.pre("save", async function (next) {
-  if (!this.isModified("senha")) return next();
+EmpresaSchema.pre("save", async function () {
+  if (!this.isModified("senha")) return;
   if (!this.senha.startsWith("$2")) {
     this.senha = bcrypt.hashSync(this.senha, 10);
   }
-  next();
 });
 
 const AdminSchema = new mongoose.Schema({
@@ -39,14 +38,13 @@ const AdminSchema = new mongoose.Schema({
 });
 
 // Middleware para criptografar senha se não estiver já criptografada
-AdminSchema.pre("save", async function (next) {
-  if (!this.isModified("senha")) return next();
+AdminSchema.pre("save", async function () {
+  if (!this.isModified("senha")) return;
 
   // Se a senha não começa com '$2' (hash bcrypt), criptografa
   if (!this.senha.startsWith("$2")) {
     this.senha = bcrypt.hashSync(this.senha, 10);
   }
-  next();
 });
 
 // Índice único: cada empresa pode ter um admin com mesmo nome, mas não pode haver duplicatas globais para super admin
@@ -66,12 +64,11 @@ const SetorSchema = new mongoose.Schema({
 });
 
 // Middleware para criptografar senha do setor
-SetorSchema.pre("save", async function (next) {
-  if (!this.isModified("senha")) return next();
+SetorSchema.pre("save", async function () {
+  if (!this.isModified("senha")) return;
   if (!this.senha.startsWith("$2")) {
     this.senha = bcrypt.hashSync(this.senha, 10);
   }
-  next();
 });
 
 const FuncionarioSchema = new mongoose.Schema({
@@ -88,12 +85,11 @@ const FuncionarioSchema = new mongoose.Schema({
 });
 
 // Middleware para criptografar senha do funcionário
-FuncionarioSchema.pre("save", async function (next) {
-  if (!this.isModified("senha")) return next();
+FuncionarioSchema.pre("save", async function () {
+  if (!this.isModified("senha")) return;
   if (this.senha && !this.senha.startsWith("$2")) {
     this.senha = bcrypt.hashSync(this.senha, 10);
   }
-  next();
 });
 
 const ColetaSchema = new mongoose.Schema({
