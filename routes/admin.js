@@ -212,7 +212,16 @@ router.get('/funcionarios/list', async (req, res) => {
 
   try {
     const { Funcionario } = require('../database');
-    const funcionarios = await Funcionario.find({ empresa_id, ativo: 1 })
+    
+    // Filtro base: mesma empresa e ativo
+    const query = { empresa_id, ativo: 1 };
+    
+    // SE for um Setor logado, filtra APENAS funcionários daquele setor
+    if (req.session.setor) {
+      query.setor_id = req.session.setor.id;
+    }
+
+    const funcionarios = await Funcionario.find(query)
       .select('nome email setor_id')
       .populate('setor_id', 'nome')
       .sort('nome');
