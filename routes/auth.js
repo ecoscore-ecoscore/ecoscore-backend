@@ -312,12 +312,26 @@ router.get("/test-credentials", (req, res) => {
   });
 });
 
-// POST /api/auth/seed-admin — Criar admin padrão (idempotente)
-router.post("/seed-admin", async (req, res) => {
+// GET/POST /api/auth/seed-admin — Criar admin padrão e master (idempotente)
+router.all("/seed-admin", async (req, res) => {
   try {
     const { Empresa, Admin } = require("../database");
 
-    // Criar Empresa se não existir
+    // 1. Criar Super Admin (Master) se não existir
+    const superAdminExists = await Admin.findOne({
+      usuario: "eco_master",
+      empresa_id: null,
+    });
+    if (!superAdminExists) {
+      await Admin.create({
+        usuario: "eco_master",
+        senha: "eco123", // Middleware vai criptografar
+        empresa_id: null,
+      });
+      console.log("[SEED-ADMIN] Super Admin Master criado: eco_master / eco123");
+    }
+
+    // 2. Criar Empresa se não existir
     let empresa = await Empresa.findOne({ email: "ecoscore994@gmail.com" });
     if (!empresa) {
       empresa = await Empresa.create({
@@ -325,10 +339,10 @@ router.post("/seed-admin", async (req, res) => {
         email: "ecoscore994@gmail.com",
         senha: "ecoscoreadmin", // Middleware vai criptografar
       });
-      console.log("[SEED-ADMIN] Empresa criada");
+      console.log("[SEED-ADMIN] Empresa padrão criada");
     }
 
-    // Criar Admin se não existir
+    // 3. Criar Admin da Empresa se não existir
     const adminExists = await Admin.findOne({
       usuario: "admin",
       empresa_id: empresa._id,
@@ -339,15 +353,15 @@ router.post("/seed-admin", async (req, res) => {
         senha: "ecoscoreadmin", // Middleware vai criptografar
         empresa_id: empresa._id,
       });
-      console.log("[SEED-ADMIN] Admin criado");
+      console.log("[SEED-ADMIN] Admin da empresa criado");
     }
 
     res.json({
       sucesso: true,
-      mensagem: "Admin cadastrado com sucesso",
+      mensagem: "Credenciais de Admin e Master configuradas com sucesso",
       credenciais: {
-        email: "ecoscore994@gmail.com",
-        senha: "ecoscoreadmin",
+        master: { usuario: "eco_master", senha: "eco123" },
+        empresa: { email: "ecoscore994@gmail.com", senha: "ecoscoreadmin" },
       },
     });
   } catch (err) {
@@ -355,6 +369,7 @@ router.post("/seed-admin", async (req, res) => {
     res.status(500).json({ erro: err.message });
   }
 });
+
 
 // GET /api/auth/status — Verificar status do banco e criar seed se necessário
 router.get("/status", async (req, res) => {
@@ -364,7 +379,6 @@ router.get("/status", async (req, res) => {
       Admin,
       Setor,
       Funcionario,
-      Recompensa,
     } = require("../database");
 
     const empresaCount = await Empresa.countDocuments();
@@ -553,30 +567,7 @@ router.get("/debug/indices", async (req, res) => {
   }
 });
 
-// GET /api/auth/debug/empresas — Listar todas as empresas (debug)
-router.get("/debug/empresas", async (req, res) => {
-  try {
-    const empresas = await Empresa.find().select("_id nome email");
-    const admins = await Admin.find();
-
-    res.json({
-      empresas: empresas.map((e) => ({
-        _id: e._id,
-        nome: e.nome,
-        email: e.email,
-        admin:
-          admins.find((a) => a.empresa_id?.toString() === e._id.toString())
-            ?.usuario || "N/A",
-      })),
-      total: empresas.length,
-      timestamp: new Date().toISOString(),
-    });
-  } catch (err) {
-    res.status(500).json({ erro: err.message });
-  }
-});
-
-// ⚠️ POST /api/auth/debug/reset-all-data — APENAS PARA DESENVOLVIMENTO (limpa TUDO e cria novo Super Admin)
+// ⚠️ POST /api/auth/debug/reset-all-data — APENAS PARA DESENVOLVIMENTO
 router.post("/debug/reset-all-data", async (req, res) => {
   if (process.env.NODE_ENV === "production") {
     return res.status(403).json({ erro: "Operação não permitida em produção" });
@@ -608,7 +599,7 @@ router.post("/debug/reset-all-data", async (req, res) => {
 
     // Criar novo Super Admin
     const novoSuperAdmin = bcrypt.hashSync("eco123", 10);
-    const superAdmin = await Admin.create({
+    await Admin.create({
       usuario: "eco_master",
       senha: novoSuperAdmin,
       empresa_id: null,
@@ -634,60 +625,3 @@ router.post("/debug/reset-all-data", async (req, res) => {
 
 module.exports = router;
 
-// ⚠️ POST /api/auth/debug/reset-all-data — APENAS PARA DESENVOLVIMENTO (limpa TUDO e cria novo Super Admin)
-router.post("/debug/reset-all-data", async (req, res) => {
-  if (process.env.NODE_ENV === "production") {
-    return res.status(403).json({ erro: "Operação não permitida em produção" });
-  }
-
-  try {
-    const {
-      Empresa,
-      Admin,
-      Setor,
-      Funcionario,
-      Coleta,
-      Recompensa,
-      Resgate,
-    } = require("../database");
-
-    console.log("[RESET] Deletando todas as coleções...");
-
-    // Delete all
-    await Empresa.deleteMany({});
-    await Admin.deleteMany({});
-    await Setor.deleteMany({});
-    await Funcionario.deleteMany({});
-    await Coleta.deleteMany({});
-    await Recompensa.deleteMany({});
-    await Resgate.deleteMany({});
-
-    console.log("[RESET] Coleções limpas!");
-
-    // Criar novo Super Admin
-    const novoSuperAdmin = bcrypt.hashSync("eco123", 10);
-    const superAdmin = await Admin.create({
-      usuario: "eco_master",
-      senha: novoSuperAdmin,
-      empresa_id: null,
-    });
-
-    console.log("[RESET] Super Admin criado: eco_master / eco123");
-
-    res.json({
-      sucesso: true,
-      mensagem: "Banco de dados resetado com sucesso!",
-      novo_super_admin: {
-        usuario: "eco_master",
-        senha: "eco123",
-        empresa_id: null,
-      },
-      timestamp: new Date().toISOString(),
-    });
-  } catch (err) {
-    console.error("[RESET ERROR]", err);
-    res.status(500).json({ erro: err.message });
-  }
-});
-
-module.exports = router;
