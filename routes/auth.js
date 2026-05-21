@@ -19,15 +19,15 @@ router.post("/register-company", async (req, res) => {
   }
 
   try {
-    console.log("[REGISTER-COMPANY] Hashando senha...");
-    const senhaHash = bcrypt.hashSync(senha, 10);
+    console.log("[REGISTER-COMPANY] Processando registro de empresa...");
+    // Middleware vai criptografar a senha automaticamente
 
     console.log("[REGISTER-COMPANY] Criando empresa...");
     // Criar empresa
     const empresa = await Empresa.create({
       nome,
       email,
-      senha: senhaHash,
+      senha: senha, // Middleware vai criptografar
     });
     console.log("[REGISTER-COMPANY] Empresa criada:", empresa._id);
 
@@ -35,7 +35,7 @@ router.post("/register-company", async (req, res) => {
     console.log("[REGISTER-COMPANY] Criando admin padrão...");
     const admin = await Admin.create({
       usuario: "admin",
-      senha: senhaHash,
+      senha: senha, // Middleware vai criptografar
       empresa_id: empresa._id,
     });
     console.log("[REGISTER-COMPANY] Admin criado:", admin._id);
@@ -269,7 +269,7 @@ router.post("/alterar-senha", async (req, res) => {
     }
 
     // Atualizar senha
-    usuario.senha = bcrypt.hashSync(novaSenha, 10);
+    usuario.senha = novaSenha; // Middleware vai criptografar
     await usuario.save();
 
     res.json({ sucesso: true, mensagem: "Senha alterada com sucesso" });
@@ -320,11 +320,10 @@ router.post("/seed-admin", async (req, res) => {
     // Criar Empresa se não existir
     let empresa = await Empresa.findOne({ email: "ecoscore994@gmail.com" });
     if (!empresa) {
-      const senhaEmpresa = bcrypt.hashSync("ecoscoreadmin", 10);
       empresa = await Empresa.create({
         nome: "EcoScore",
         email: "ecoscore994@gmail.com",
-        senha: senhaEmpresa,
+        senha: "ecoscoreadmin", // Middleware vai criptografar
       });
       console.log("[SEED-ADMIN] Empresa criada");
     }
@@ -335,10 +334,9 @@ router.post("/seed-admin", async (req, res) => {
       empresa_id: empresa._id,
     });
     if (!adminExists) {
-      const senhaAdmin = bcrypt.hashSync("ecoscoreadmin", 10);
       await Admin.create({
         usuario: "admin",
-        senha: senhaAdmin,
+        senha: "ecoscoreadmin", // Middleware vai criptografar
         empresa_id: empresa._id,
       });
       console.log("[SEED-ADMIN] Admin criado");
@@ -376,47 +374,42 @@ router.get("/status", async (req, res) => {
     if (empresaCount === 0) {
       console.log("🔄 Seed manual iniciado...");
 
-      const senhaEmpresa = bcrypt.hashSync("ecoscoreadmin", 10);
       const empresa = await Empresa.create({
         nome: "EcoScore",
         email: "ecoscore994@gmail.com",
-        senha: senhaEmpresa,
+        senha: "ecoscoreadmin", // Middleware vai criptografar
       });
 
-      const senhaSuperAdmin = bcrypt.hashSync("eco123", 10);
       await Admin.create({
         usuario: "eco_master",
-        senha: senhaSuperAdmin,
+        senha: "eco123", // Middleware vai criptografar
         empresa_id: null,
       });
 
-      const senhaAdmin = bcrypt.hashSync("admin123", 10);
       await Admin.create({
         usuario: "admin",
-        senha: senhaAdmin,
+        senha: "admin123", // Middleware vai criptografar
         empresa_id: empresa._id,
       });
 
-      const senhaSetor = bcrypt.hashSync("ecoscore123", 10);
       const setoresSeed = [
         {
           nome: "Marketing",
           login: "marketing",
           dia_semana: 1,
           empresa_id: empresa._id,
-          senha: senhaSetor,
+          senha: "ecoscore123", // Middleware vai criptografar
         },
         {
           nome: "RH",
           login: "rh",
           dia_semana: 2,
           empresa_id: empresa._id,
-          senha: senhaSetor,
+          senha: "ecoscore123", // Middleware vai criptografar
         },
       ];
       await Setor.insertMany(setoresSeed);
 
-      const senhaFunc = bcrypt.hashSync("funcionario123", 10);
       const marketing = await Setor.findOne({
         login: "marketing",
         empresa_id: empresa._id,
@@ -424,7 +417,7 @@ router.get("/status", async (req, res) => {
       await Funcionario.create({
         nome: "Ana Silva",
         email: "ana@demo.com",
-        senha: senhaFunc,
+        senha: "funcionario123", // Middleware vai criptografar
         setor_id: marketing._id,
         empresa_id: empresa._id,
       });

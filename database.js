@@ -19,6 +19,15 @@ const EmpresaSchema = new mongoose.Schema({
   data_cadastro: { type: Date, default: Date.now },
 });
 
+// Middleware para criptografar senha da empresa
+EmpresaSchema.pre("save", async function (next) {
+  if (!this.isModified("senha")) return next();
+  if (!this.senha.startsWith("$2")) {
+    this.senha = bcrypt.hashSync(this.senha, 10);
+  }
+  next();
+});
+
 const AdminSchema = new mongoose.Schema({
   usuario: { type: String, required: true },
   senha: { type: String, required: true },
@@ -27,6 +36,17 @@ const AdminSchema = new mongoose.Schema({
     ref: "Empresa",
     default: null,
   }, // null para Super Admin
+});
+
+// Middleware para criptografar senha se não estiver já criptografada
+AdminSchema.pre("save", async function (next) {
+  if (!this.isModified("senha")) return next();
+
+  // Se a senha não começa com '$2' (hash bcrypt), criptografa
+  if (!this.senha.startsWith("$2")) {
+    this.senha = bcrypt.hashSync(this.senha, 10);
+  }
+  next();
 });
 
 // Índice único: cada empresa pode ter um admin com mesmo nome, mas não pode haver duplicatas globais para super admin
@@ -45,6 +65,15 @@ const SetorSchema = new mongoose.Schema({
   },
 });
 
+// Middleware para criptografar senha do setor
+SetorSchema.pre("save", async function (next) {
+  if (!this.isModified("senha")) return next();
+  if (!this.senha.startsWith("$2")) {
+    this.senha = bcrypt.hashSync(this.senha, 10);
+  }
+  next();
+});
+
 const FuncionarioSchema = new mongoose.Schema({
   nome: { type: String, required: true },
   email: { type: String, unique: true, sparse: true },
@@ -56,6 +85,15 @@ const FuncionarioSchema = new mongoose.Schema({
     ref: "Empresa",
     required: true,
   },
+});
+
+// Middleware para criptografar senha do funcionário
+FuncionarioSchema.pre("save", async function (next) {
+  if (!this.isModified("senha")) return next();
+  if (this.senha && !this.senha.startsWith("$2")) {
+    this.senha = bcrypt.hashSync(this.senha, 10);
+  }
+  next();
 });
 
 const ColetaSchema = new mongoose.Schema({
@@ -143,11 +181,10 @@ async function seed() {
     // Empresa padrão
     let empresa = await Empresa.findOne({ email: "ecoscore994@gmail.com" });
     if (!empresa) {
-      const senhaEmpresa = bcrypt.hashSync("ecoscoreadmin", 10);
       empresa = await Empresa.create({
         nome: "EcoScore",
         email: "ecoscore994@gmail.com",
-        senha: senhaEmpresa,
+        senha: "ecoscoreadmin", // Middleware vai criptografar
       });
       console.log(
         "[DB] Empresa EcoScore criada: ecoscore994@gmail.com / ecoscoreadmin",
@@ -160,11 +197,10 @@ async function seed() {
       empresa_id: empresa._id,
     });
     if (!adminExists) {
-      const senha = bcrypt.hashSync("ecoscoreadmin", 10);
       try {
         await Admin.create({
           usuario: "admin",
-          senha: senha,
+          senha: "ecoscoreadmin", // Middleware vai criptografar
           empresa_id: empresa._id,
         });
         console.log("[DB] Admin criado com sucesso");
