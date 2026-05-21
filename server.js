@@ -51,6 +51,8 @@ app.use(express.urlencoded({ extended: true }));
 // (No futuro, esta pasta será removida para o repositório frontend)
 app.use(express.static(path.join(__dirname, "public")));
 
+const MongoStore = require("connect-mongo");
+
 app.set("trust proxy", 1); // Confia no proxy da Vercel para cookies seguros
 
 app.use(
@@ -58,8 +60,12 @@ app.use(
     secret: process.env.SESSION_SECRET || "ecoscore-secret-2026",
     resave: false,
     saveUninitialized: false,
+    store: MongoStore.create({
+      mongoUrl: process.env.MONGODB_URI || "mongodb+srv://ecoscore994_db_user:rRW1AeLn6tpShP0i@ecoscore.bmqnwxt.mongodb.net/ecoscore?retryWrites=true&w=majority",
+      ttl: 14 * 24 * 60 * 60, // 14 dias
+    }),
     cookie: {
-      httpOnly: false, // Permite que o frontend acesse o cookie se necessário
+      httpOnly: true,
       secure: true, // SEMPRE true em Vercel (HTTPS)
       sameSite: "none", // Necessário para cross-domain
       maxAge: 8 * 60 * 60 * 1000, // 8 horas
