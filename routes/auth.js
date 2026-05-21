@@ -150,48 +150,52 @@ router.post("/login", async (req, res) => {
 
     // 2. Tentar como Setor (Login)
     console.log("[LOGIN] Buscando Setor...");
-    const setor = await Setor.findOne({ login: login, ativo: 1 }).maxTimeMS(5000);
-    if (setor && bcrypt.compareSync(senha, setor.senha)) {
-      console.log("[LOGIN] Setor identificado.");
-      req.session.setor = {
-        id: setor._id,
-        nome: setor.nome,
-        login: setor.login,
-        dia_semana: setor.dia_semana,
-        empresa_id: setor.empresa_id,
-      };
-      return req.session.save((err) => {
-        if (err) return res.status(500).json({ erro: "Erro ao salvar sessão Setor", detalhes: err.message });
-        res.json({
-          sucesso: true,
-          tipo: "setor",
-          redirecionar: "/dashboard.html",
+    const setores = await Setor.find({ login: login, ativo: 1 }).maxTimeMS(5000);
+    for (const s of setores) {
+      if (bcrypt.compareSync(senha, s.senha)) {
+        console.log("[LOGIN] Setor identificado.");
+        req.session.setor = {
+          id: s._id,
+          nome: s.nome,
+          login: s.login,
+          dia_semana: s.dia_semana,
+          empresa_id: s.empresa_id,
+        };
+        return req.session.save((err) => {
+          if (err) return res.status(500).json({ erro: "Erro ao salvar sessão Setor", detalhes: err.message });
+          res.json({
+            sucesso: true,
+            tipo: "setor",
+            redirecionar: "/dashboard.html",
+          });
         });
-      });
+      }
     }
 
     // 3. Tentar como Funcionário (E-mail)
     console.log("[LOGIN] Buscando Funcionário...");
-    const func = await Funcionario.findOne({ email: login, ativo: 1 }).populate("setor_id").maxTimeMS(5000);
-    if (func && bcrypt.compareSync(senha, func.senha)) {
-      console.log("[LOGIN] Funcionário identificado.");
-      req.session.funcionario = {
-        id: func._id,
-        nome: func.nome,
-        email: func.email,
-        setor_id: func.setor_id ? func.setor_id._id : null,
-        setor_nome: func.setor_id ? func.setor_id.nome : null,
-        dia_semana: func.setor_id ? func.setor_id.dia_semana : null,
-        empresa_id: func.empresa_id,
-      };
-      return req.session.save((err) => {
-        if (err) return res.status(500).json({ erro: "Erro ao salvar sessão Funcionário", detalhes: err.message });
-        res.json({
-          sucesso: true,
-          tipo: "funcionario",
-          redirecionar: "/user.html",
+    const funcionarios = await Funcionario.find({ email: login, ativo: 1 }).populate("setor_id").maxTimeMS(5000);
+    for (const f of funcionarios) {
+      if (bcrypt.compareSync(senha, f.senha)) {
+        console.log("[LOGIN] Funcionário identificado.");
+        req.session.funcionario = {
+          id: f._id,
+          nome: f.nome,
+          email: f.email,
+          setor_id: f.setor_id ? f.setor_id._id : null,
+          setor_nome: f.setor_id ? f.setor_id.nome : null,
+          dia_semana: f.setor_id ? f.setor_id.dia_semana : null,
+          empresa_id: f.empresa_id,
+        };
+        return req.session.save((err) => {
+          if (err) return res.status(500).json({ erro: "Erro ao salvar sessão Funcionário", detalhes: err.message });
+          res.json({
+            sucesso: true,
+            tipo: "funcionario",
+            redirecionar: "/user.html",
+          });
         });
-      });
+      }
     }
 
     console.log("[LOGIN] Credenciais incorretas.");

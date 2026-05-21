@@ -27,8 +27,8 @@ router.post('/setores', authAdmin, async (req, res) => {
   if (!nome || !login || !senha || !dia_semana) return res.status(400).json({ erro: 'Todos os campos são obrigatórios' });
 
   try {
-    const exists = await Setor.findOne({ login });
-    if (exists) return res.status(409).json({ erro: 'Login já existe' });
+    const exists = await Setor.findOne({ login, empresa_id });
+    if (exists) return res.status(409).json({ erro: 'Login já existe nesta empresa' });
 
     const senhaHash = bcrypt.hashSync(senha, 10);
     const setor = await Setor.create({
@@ -90,8 +90,8 @@ router.post('/funcionarios', authAdmin, async (req, res) => {
   if (!nome || !email || !senha) return res.status(400).json({ erro: 'Nome, E-mail e Senha são obrigatórios' });
 
   try {
-    const exists = await Funcionario.findOne({ email });
-    if (exists) return res.status(409).json({ erro: 'E-mail já cadastrado para outro funcionário' });
+    const exists = await Funcionario.findOne({ email, empresa_id });
+    if (exists) return res.status(409).json({ erro: 'E-mail já cadastrado nesta empresa' });
 
     const senhaHash = bcrypt.hashSync(senha, 10);
     const func = await Funcionario.create({

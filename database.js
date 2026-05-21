@@ -80,7 +80,7 @@ AdminSchema.index({ usuario: 1, empresa_id: 1 }, { unique: true });
 
 const SetorSchema = new mongoose.Schema({
   nome: { type: String, required: true },
-  login: { type: String, unique: true, required: true },
+  login: { type: String, required: true },
   senha: { type: String, required: true },
   dia_semana: { type: Number, required: true },
   ativo: { type: Number, default: 1 },
@@ -91,6 +91,9 @@ const SetorSchema = new mongoose.Schema({
   },
 });
 
+// Índice único: cada empresa pode ter um login (ex: marketing), mas não pode repetir na mesma empresa
+SetorSchema.index({ login: 1, empresa_id: 1 }, { unique: true });
+
 SetorSchema.pre("save", async function () {
   if (!this.isModified("senha")) return;
   if (!this.senha.startsWith("$2")) {
@@ -100,7 +103,7 @@ SetorSchema.pre("save", async function () {
 
 const FuncionarioSchema = new mongoose.Schema({
   nome: { type: String, required: true },
-  email: { type: String, unique: true, sparse: true },
+  email: { type: String, sparse: true },
   senha: { type: String },
   setor_id: { type: mongoose.Schema.Types.ObjectId, ref: "Setor" },
   ativo: { type: Number, default: 1 },
@@ -110,6 +113,9 @@ const FuncionarioSchema = new mongoose.Schema({
     required: true,
   },
 });
+
+// Índice único por empresa para o e-mail
+FuncionarioSchema.index({ email: 1, empresa_id: 1 }, { unique: true, sparse: true });
 
 FuncionarioSchema.pre("save", async function () {
   if (!this.isModified("senha")) return;
