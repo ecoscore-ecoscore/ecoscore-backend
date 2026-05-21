@@ -108,10 +108,16 @@ router.post("/login", async (req, res) => {
         empresa_id: null,
         empresa_nome: "EcoScore Master",
       };
-      return res.json({
-        sucesso: true,
-        tipo: "super",
-        redirecionar: "/super-admin.html",
+      return req.session.save((err) => {
+        if (err) {
+          console.error("[SESSION SAVE ERROR]", err);
+          return res.status(500).json({ erro: "Erro ao salvar sessão" });
+        }
+        res.json({
+          sucesso: true,
+          tipo: "super",
+          redirecionar: "/super-admin.html",
+        });
       });
     }
 
@@ -125,10 +131,13 @@ router.post("/login", async (req, res) => {
         empresa_id: empresa._id,
         empresa_nome: empresa.nome,
       };
-      return res.json({
-        sucesso: true,
-        tipo: "admin",
-        redirecionar: "/admin.html",
+      return req.session.save((err) => {
+        if (err) return res.status(500).json({ erro: "Erro ao salvar sessão" });
+        res.json({
+          sucesso: true,
+          tipo: "admin",
+          redirecionar: "/admin.html",
+        });
       });
     }
 
@@ -142,10 +151,13 @@ router.post("/login", async (req, res) => {
         dia_semana: setor.dia_semana,
         empresa_id: setor.empresa_id,
       };
-      return res.json({
-        sucesso: true,
-        tipo: "setor",
-        redirecionar: "/dashboard.html",
+      return req.session.save((err) => {
+        if (err) return res.status(500).json({ erro: "Erro ao salvar sessão" });
+        res.json({
+          sucesso: true,
+          tipo: "setor",
+          redirecionar: "/dashboard.html",
+        });
       });
     }
 
@@ -163,10 +175,13 @@ router.post("/login", async (req, res) => {
         dia_semana: func.setor_id ? func.setor_id.dia_semana : null,
         empresa_id: func.empresa_id,
       };
-      return res.json({
-        sucesso: true,
-        tipo: "funcionario",
-        redirecionar: "/user.html",
+      return req.session.save((err) => {
+        if (err) return res.status(500).json({ erro: "Erro ao salvar sessão" });
+        res.json({
+          sucesso: true,
+          tipo: "funcionario",
+          redirecionar: "/user.html",
+        });
       });
     }
 

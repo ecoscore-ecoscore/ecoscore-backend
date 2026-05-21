@@ -26,29 +26,25 @@ const allowedOrigins = [
 
 app.use(
   cors({
-    origin: allowedOrigins,
+    origin: function (origin, callback) {
+      // Permite requests sem origin (como mobile apps ou curl)
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.indexOf(origin) !== -1 || origin.includes("vercel.app")) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-    optionsSuccessStatus: 200,
+    allowedHeaders: ["Content-Type", "Authorization", "Cookie"],
   }),
 );
-
-// Adicionar headers CORS manualmente como fallback
-app.use((req, res, next) => {
-  const origin = req.headers.origin;
-  if (allowedOrigins.includes(origin)) {
-    res.header("Access-Control-Allow-Origin", origin);
-    res.header("Access-Control-Allow-Credentials", "true");
-  }
-  next();
-});
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Serve arquivos estáticos apenas se ainda estiverem no mesmo projeto
-// (No futuro, esta pasta será removida para o repositório frontend)
 app.use(express.static(path.join(__dirname, "public")));
 
 const MongoStore = require("connect-mongo");
@@ -58,17 +54,17 @@ app.set("trust proxy", 1); // Confia no proxy da Vercel para cookies seguros
 app.use(
   session({
     secret: process.env.SESSION_SECRET || "ecoscore-secret-2026",
-    resave: false,
+    resave: true, // Força a gravação da sessão de volta para o store
     saveUninitialized: false,
     store: MongoStore.create({
       mongoUrl: process.env.MONGODB_URI || "mongodb+srv://ecoscore994_db_user:rRW1AeLn6tpShP0i@ecoscore.bmqnwxt.mongodb.net/ecoscore?retryWrites=true&w=majority",
-      ttl: 14 * 24 * 60 * 60, // 14 dias
+      ttl: 14 * 24 * 60 * 60,
     }),
     cookie: {
       httpOnly: true,
-      secure: true, // SEMPRE true em Vercel (HTTPS)
-      sameSite: "none", // Necessário para cross-domain
-      maxAge: 8 * 60 * 60 * 1000, // 8 horas
+      secure: true,
+      sameSite: "none",
+      maxAge: 8 * 60 * 60 * 1000,
     },
   }),
 );
@@ -78,6 +74,9 @@ app.use("/api/auth", require("./routes/auth"));
 
 // ─── Rota de sessão atual ─────────────────────────────────────────────────────
 app.get("/api/me", (req, res) => {
+  console.log("🔍 [API/ME] Session ID:", req.sessionID);
+  console.log("🔍 [API/ME] Session Content:", req.session);
+
   if (req.session.setor) {
     return res.json({ logado: true, tipo: "setor", ...req.session.setor });
   }
