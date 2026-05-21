@@ -11,31 +11,23 @@ const dbModule = require("./database");
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Configurações de CORS ultra-permitivas para Vercel
+// Configuração de CORS robusta
 const allowedOrigins = [
   process.env.FRONTEND_URL,
-  "http://localhost:5000",
-  "http://localhost:3000",
-  "http://127.0.0.1:5000",
-  "http://127.0.0.1:3000",
   "https://ecoscore-gold.vercel.app",
-].filter(Boolean);
+  "https://ecoscore-backend.vercel.app",
+].filter(Boolean).map(o => o.replace(/\/$/, ""));
 
 app.use(
   cors({
     origin: function (origin, callback) {
-      // Permitir requests sem origin (como mobile apps ou curl)
       if (!origin) return callback(null, true);
-      
-      // Permitir qualquer subdomínio vercel.app ou origins permitidas
       const isVercel = origin.endsWith(".vercel.app");
-      const isAllowed = allowedOrigins.indexOf(origin) !== -1;
-      
+      const isAllowed = allowedOrigins.includes(origin);
       if (isVercel || isAllowed) {
         callback(null, true);
       } else {
-        console.warn(`[CORS] Bloqueado: ${origin}`);
-        callback(new Error("Not allowed by CORS"));
+        callback(null, false); // Rejeita silenciosamente para evitar erros de pré-vôo
       }
     },
     credentials: true,
@@ -47,30 +39,33 @@ app.use(
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Trust Proxy é vital na Vercel
 app.set("trust proxy", 1); 
 
-// Configuração da Sessão
+// Sessão
 app.use(
   session({
-    secret: process.env.SESSION_SECRET || "ecoscore-secret-2026",
-    resave: false,
+    name: "ecoscore.sid", // Nome customizado para evitar conflitos
+    secret: process.env.SESSION_SECRET || "ecoscore-secret-v2-2026",
+    resave: true,
     saveUninitialized: false,
+    rolling: true,
+    proxy: true,
     store: MongoStore.create({
       mongoUrl: process.env.MONGODB_URI || "mongodb+srv://ecoscore994_db_user:rRW1AeLn6tpShP0i@ecoscore.bmqnwxt.mongodb.net/ecoscore?retryWrites=true&w=majority",
       ttl: 14 * 24 * 60 * 60,
-      autoRemove: 'native',
-      touchAfter: 3600 // Reduz escritas no banco
+      touchAfter: 60
     }),
     cookie: {
       httpOnly: true,
-      secure: true,
-      sameSite: "none",
-      maxAge: 8 * 60 * 60 * 1000, // 8 horas
+      secure: true,      // HTTPS obrigatório
+      sameSite: "none",   // Cross-site obrigatório
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 dias
     },
   }),
 );
 
-// Middleware para garantir conexão com o banco
+// Conexão com DB
 app.use(async (req, res, next) => {
   if (req.path.startsWith('/api')) {
     try {
@@ -88,28 +83,30 @@ app.use(async (req, res, next) => {
 app.use("/api/auth", require("./routes/auth"));
 
 app.get("/api/me", (req, res) => {
-  if (req.session.setor) return res.json({ logado: true, tipo: "setor", ...req.session.setor });
+  // Logs para depuração no console da Vercel
+  console.log(`[SESSION CHECK] ID: ${req.sessionID} | Data: ${JSON.stringify(req.session)}`);
+  
   if (req.session.admin) return res.json({ logado: true, tipo: "admin", ...req.session.admin });
+  if (req.session.setor) return res.json({ logado: true, tipo: "setor", ...req.session.setor });
   if (req.session.funcionario) return res.json({ logado: true, tipo: "funcionario", ...req.session.funcionario });
+  
   res.json({ logado: false });
 });
 
+// Outras APIs
 app.use("/api/coletas", require("./routes/coletas"));
 app.use("/api/ranking", require("./routes/ranking"));
 app.use("/api/recompensas", require("./routes/recompensas"));
 app.use("/api/admin", require("./routes/admin"));
 app.use("/api/super", require("./routes/super"));
 
-// Arquivos estáticos
+// Frontend
 app.use(express.static(path.join(__dirname, "public")));
-
 app.get("*", (req, res) => {
-  if (req.path.startsWith("/api")) return res.status(404).json({ erro: "Rota não encontrada" });
+  if (req.path.startsWith("/api")) return res.status(404).json({ erro: "API não encontrada" });
   res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
-app.listen(PORT, () => {
-  console.log(`\n🌿 EcoScore rodando na porta ${PORT}`);
-});
+app.listen(PORT, () => console.log(`🌿 EcoScore Ready`));
 
 module.exports = app;
