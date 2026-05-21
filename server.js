@@ -48,17 +48,31 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, "public")));
 
 const MongoStore = require("connect-mongo");
+const mongoose = require("mongoose");
 
-app.set("trust proxy", 1); // Confia no proxy da Vercel para cookies seguros
+app.set("trust proxy", 1); 
+
+// Middleware para verificar se o banco está pronto antes de processar APIs
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api') && !['/api/auth/diagnostico', '/api/auth/status', '/api/auth/seed-admin'].includes(req.path)) {
+    if (mongoose.connection.readyState !== 1) {
+      return res.status(503).json({ 
+        erro: "Banco de dados em processo de conexão ou desconectado.",
+        status: mongoose.connection.readyState 
+      });
+    }
+  }
+  next();
+});
 
 app.use(
   session({
     secret: process.env.SESSION_SECRET || "ecoscore-secret-2026",
-    resave: true, // Força a gravação da sessão de volta para o store
+    resave: true,
     saveUninitialized: false,
     store: MongoStore.create({
       mongoUrl: process.env.MONGODB_URI || "mongodb+srv://ecoscore994_db_user:rRW1AeLn6tpShP0i@ecoscore.bmqnwxt.mongodb.net/ecoscore?retryWrites=true&w=majority",
-      ttl: 14 * 24 * 60 * 60,
+      touchAfter: 24 * 3600 // Atualiza a sessão apenas uma vez por dia se não houver mudanças
     }),
     cookie: {
       httpOnly: true,

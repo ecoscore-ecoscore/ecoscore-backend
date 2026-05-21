@@ -95,13 +95,18 @@ router.post("/login", async (req, res) => {
   if (!login || !senha)
     return res.status(400).json({ erro: "Login e senha obrigatórios" });
 
+  console.log(`[LOGIN] Tentativa de login para: ${login}`);
+
   try {
-    // 0. Tentar como Super Admin (Admin do Sistema - Sem Empresa)
+    // 0. Tentar como Super Admin
+    console.log("[LOGIN] Buscando Super Admin...");
     const superAdmin = await Admin.findOne({
       usuario: login,
       empresa_id: null,
-    });
+    }).timeout(5000);
+    
     if (superAdmin && bcrypt.compareSync(senha, superAdmin.senha)) {
+      console.log("[LOGIN] Super Admin identificado.");
       req.session.admin = {
         id: superAdmin._id,
         usuario: superAdmin.usuario,
@@ -111,7 +116,7 @@ router.post("/login", async (req, res) => {
       return req.session.save((err) => {
         if (err) {
           console.error("[SESSION SAVE ERROR]", err);
-          return res.status(500).json({ erro: "Erro ao salvar sessão" });
+          return res.status(500).json({ erro: "Erro ao salvar sessão Master", detalhes: err.message });
         }
         res.json({
           sucesso: true,
@@ -122,8 +127,10 @@ router.post("/login", async (req, res) => {
     }
 
     // 1. Tentar como Empresa/Admin (E-mail)
-    const empresa = await Empresa.findOne({ email: login });
+    console.log("[LOGIN] Buscando Empresa...");
+    const empresa = await Empresa.findOne({ email: login }).timeout(5000);
     if (empresa && bcrypt.compareSync(senha, empresa.senha)) {
+      console.log("[LOGIN] Empresa/Admin identificada.");
       const admin = await Admin.findOne({ empresa_id: empresa._id });
       req.session.admin = {
         id: admin ? admin._id : empresa._id,
@@ -132,7 +139,7 @@ router.post("/login", async (req, res) => {
         empresa_nome: empresa.nome,
       };
       return req.session.save((err) => {
-        if (err) return res.status(500).json({ erro: "Erro ao salvar sessão" });
+        if (err) return res.status(500).json({ erro: "Erro ao salvar sessão Admin", detalhes: err.message });
         res.json({
           sucesso: true,
           tipo: "admin",
@@ -142,8 +149,10 @@ router.post("/login", async (req, res) => {
     }
 
     // 2. Tentar como Setor (Login)
-    const setor = await Setor.findOne({ login: login, ativo: 1 });
+    console.log("[LOGIN] Buscando Setor...");
+    const setor = await Setor.findOne({ login: login, ativo: 1 }).timeout(5000);
     if (setor && bcrypt.compareSync(senha, setor.senha)) {
+      console.log("[LOGIN] Setor identificado.");
       req.session.setor = {
         id: setor._id,
         nome: setor.nome,
@@ -152,7 +161,7 @@ router.post("/login", async (req, res) => {
         empresa_id: setor.empresa_id,
       };
       return req.session.save((err) => {
-        if (err) return res.status(500).json({ erro: "Erro ao salvar sessão" });
+        if (err) return res.status(500).json({ erro: "Erro ao salvar sessão Setor", detalhes: err.message });
         res.json({
           sucesso: true,
           tipo: "setor",
@@ -162,10 +171,10 @@ router.post("/login", async (req, res) => {
     }
 
     // 3. Tentar como Funcionário (E-mail)
-    const func = await Funcionario.findOne({ email: login, ativo: 1 }).populate(
-      "setor_id",
-    );
+    console.log("[LOGIN] Buscando Funcionário...");
+    const func = await Funcionario.findOne({ email: login, ativo: 1 }).populate("setor_id").timeout(5000);
     if (func && bcrypt.compareSync(senha, func.senha)) {
+      console.log("[LOGIN] Funcionário identificado.");
       req.session.funcionario = {
         id: func._id,
         nome: func.nome,
@@ -176,7 +185,7 @@ router.post("/login", async (req, res) => {
         empresa_id: func.empresa_id,
       };
       return req.session.save((err) => {
-        if (err) return res.status(500).json({ erro: "Erro ao salvar sessão" });
+        if (err) return res.status(500).json({ erro: "Erro ao salvar sessão Funcionário", detalhes: err.message });
         res.json({
           sucesso: true,
           tipo: "funcionario",
@@ -185,10 +194,15 @@ router.post("/login", async (req, res) => {
       });
     }
 
+    console.log("[LOGIN] Credenciais incorretas.");
     res.status(401).json({ erro: "Credenciais incorretas ou usuário inativo" });
   } catch (err) {
     console.error("[LOGIN ERROR]", err);
-    res.status(500).json({ erro: "Erro interno ao processar login" });
+    res.status(500).json({ 
+      erro: "Erro interno ao processar login", 
+      mensagem: err.message,
+      etapa: err.stack.split('\n')[1] // Tenta pegar a linha exata do erro
+    });
   }
 });
 
