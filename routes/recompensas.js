@@ -50,30 +50,45 @@ router.post('/resgatar', authAny, async (req, res) => {
     const recompensa = await Recompensa.findOne({ _id: recompensa_id, ativo: 1, empresa_id: eid });
     if (!recompensa) return res.status(404).json({ erro: 'Recompensa não encontrada' });
 
-    // Calcular pontos atuais para validar solicitação
+    // Calcular pontos atuais (Saldo Real = Coletas - Resgates não cancelados)
     let totalPontos = 0;
     const mongoEid = new mongoose.Types.ObjectId(eid);
 
     if (recompensa.tipo === 'individual') {
-      const pts = await Coleta.aggregate([
+      // Soma coletas do funcionário
+      const ptsColeta = await Coleta.aggregate([
         { $match: { funcionario_nome, empresa_id: mongoEid } },
         { $group: { _id: null, total: { $sum: "$pontos" } } }
       ]);
-      totalPontos = pts[0]?.total || 0;
+      // Soma resgates já feitos (pendentes ou aprovados)
+      const ptsResgate = await Resgate.aggregate([
+        { $match: { funcionario_nome, empresa_id: mongoEid, status: { $ne: 'cancelado' } } },
+        { $group: { _id: null, total: { $sum: "$pontos_usados" } } }
+      ]);
+      
+      totalPontos = (ptsColeta[0]?.total || 0) - (ptsResgate[0]?.total || 0);
     } else {
       if (!sid) return res.status(400).json({ erro: 'Setor não identificado' });
       const mongoSid = new mongoose.Types.ObjectId(sid);
-      const pts = await Coleta.aggregate([
+      
+      // Soma coletas do setor
+      const ptsColeta = await Coleta.aggregate([
         { $match: { setor_id: mongoSid, empresa_id: mongoEid } },
         { $group: { _id: null, total: { $sum: "$pontos" } } }
       ]);
-      totalPontos = pts[0]?.total || 0;
+      // Soma resgates do setor (pendentes ou aprovados)
+      const ptsResgate = await Resgate.aggregate([
+        { $match: { setor_id: mongoSid, empresa_id: mongoEid, status: { $ne: 'cancelado' } } },
+        { $group: { _id: null, total: { $sum: "$pontos_usados" } } }
+      ]);
+      
+      totalPontos = (ptsColeta[0]?.total || 0) - (ptsResgate[0]?.total || 0);
     }
 
     if (totalPontos < recompensa.pontuacao_necessaria) {
       return res.status(400).json({
         erro: 'Pontos insuficientes para solicitar este prêmio',
-        pontos_atuais: totalPontos,
+        saldo_disponivel: totalPontos,
         pontos_necessarios: recompensa.pontuacao_necessaria
       });
     }
@@ -83,6 +98,7 @@ router.post('/resgatar', authAny, async (req, res) => {
       funcionario_nome, 
       setor_id: sid, 
       recompensa_id, 
+      pontos_usados: recompensa.pontuacao_necessaria, // Grava os pontos no momento do débito
       data_resgate: hoje, 
       empresa_id: eid,
       status: 'pendente'
