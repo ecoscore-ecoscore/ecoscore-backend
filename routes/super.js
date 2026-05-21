@@ -18,6 +18,7 @@ router.get('/empresas', authSuper, async (req, res) => {
       { $lookup: { from: 'setores', localField: '_id', foreignField: 'empresa_id', as: 'setores' } },
       { $lookup: { from: 'funcionarios', localField: '_id', foreignField: 'empresa_id', as: 'funcionarios' } },
       { $project: {
+          id: "$_id",
           nome: 1,
           email: 1,
           data_cadastro: 1,
