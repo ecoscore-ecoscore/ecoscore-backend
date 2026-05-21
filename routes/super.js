@@ -1,5 +1,6 @@
 const express = require('express');
-const { Empresa, Admin, Setor, Funcionario } = require('../database');
+const mongoose = require('mongoose');
+const { Empresa, Admin, Setor, Funcionario, Coleta, Recompensa, Resgate } = require('../database');
 const bcrypt = require('bcryptjs');
 const router = express.Router();
 
