@@ -13,12 +13,12 @@ function authAdmin(req, res, next) {
   next();
 }
 function authAny(req, res, next) {
-  if (!req.session.setor && !req.session.admin) return res.status(401).json({ erro: 'Não autenticado' });
+  if (!req.session.setor && !req.session.admin && !req.session.funcionario) return res.status(401).json({ erro: 'Não autenticado' });
   next();
 }
 
 function getEmpresaId(req) {
-  return req.session.admin?.empresa_id || req.session.setor?.empresa_id;
+  return req.session.admin?.empresa_id || req.session.setor?.empresa_id || req.session.funcionario?.empresa_id;
 }
 
 // GET /api/recompensas — lista todas as recompensas (requer estar logado para saber a empresa)
@@ -32,35 +32,39 @@ router.get('/', authAny, async (req, res) => {
   }
 });
 
-// POST /api/recompensas/resgatar — resgatar recompensa
-router.post('/resgatar', authSetor, async (req, res) => {
+// POST /api/recompensas/resgatar — solicitar resgate (Funcionário ou Setor)
+router.post('/resgatar', authAny, async (req, res) => {
   const { funcionario_nome, recompensa_id } = req.body;
-  const setor_id = req.session.setor.id;
+  let { empresa_id, setor_id } = getEmpresaId(req); // helper returns ID directly normally, but let's be careful
+  
+  // Refazendo lógica de pegar IDs da sessão
+  const sess = req.session;
+  const eid = sess.admin?.empresa_id || sess.setor?.empresa_id || sess.funcionario?.empresa_id;
+  const sid = sess.setor?.id || sess.funcionario?.setor_id;
 
   if (!funcionario_nome || !recompensa_id) {
     return res.status(400).json({ erro: 'Funcionário e recompensa são obrigatórios' });
   }
 
-  const empresa_id = req.session.setor.empresa_id;
-  
   try {
-    const recompensa = await Recompensa.findOne({ _id: recompensa_id, ativo: 1, empresa_id });
+    const recompensa = await Recompensa.findOne({ _id: recompensa_id, ativo: 1, empresa_id: eid });
     if (!recompensa) return res.status(404).json({ erro: 'Recompensa não encontrada' });
 
-    // Calcular pontos do funcionário/setor
+    // Calcular pontos atuais para validar solicitação
     let totalPontos = 0;
-    const eid = new mongoose.Types.ObjectId(empresa_id);
+    const mongoEid = new mongoose.Types.ObjectId(eid);
 
     if (recompensa.tipo === 'individual') {
       const pts = await Coleta.aggregate([
-        { $match: { funcionario_nome, empresa_id: eid } },
+        { $match: { funcionario_nome, empresa_id: mongoEid } },
         { $group: { _id: null, total: { $sum: "$pontos" } } }
       ]);
       totalPontos = pts[0]?.total || 0;
     } else {
-      const sid = new mongoose.Types.ObjectId(setor_id);
+      if (!sid) return res.status(400).json({ erro: 'Setor não identificado' });
+      const mongoSid = new mongoose.Types.ObjectId(sid);
       const pts = await Coleta.aggregate([
-        { $match: { setor_id: sid, empresa_id: eid } },
+        { $match: { setor_id: mongoSid, empresa_id: mongoEid } },
         { $group: { _id: null, total: { $sum: "$pontos" } } }
       ]);
       totalPontos = pts[0]?.total || 0;
@@ -68,20 +72,67 @@ router.post('/resgatar', authSetor, async (req, res) => {
 
     if (totalPontos < recompensa.pontuacao_necessaria) {
       return res.status(400).json({
-        erro: 'Pontos insuficientes',
+        erro: 'Pontos insuficientes para solicitar este prêmio',
         pontos_atuais: totalPontos,
         pontos_necessarios: recompensa.pontuacao_necessaria
       });
     }
 
     const hoje = new Date().toISOString().split('T')[0];
-    await Resgate.create({
-      funcionario_nome, setor_id, recompensa_id, data_resgate: hoje, empresa_id
+    const resgate = await Resgate.create({
+      funcionario_nome, 
+      setor_id: sid, 
+      recompensa_id, 
+      data_resgate: hoje, 
+      empresa_id: eid,
+      status: 'pendente'
     });
 
-    res.json({ sucesso: true, mensagem: `Recompensa "${recompensa.nome}" resgatada com sucesso!` });
+    res.json({ 
+      sucesso: true, 
+      mensagem: 'Solicitação de resgate enviada! Aguarde a validação do seu líder de setor.',
+      resgate_id: resgate._id 
+    });
   } catch (err) {
-    res.status(500).json({ erro: 'Erro ao resgatar recompensa' });
+    console.error('[RESGATE ERROR]', err);
+    res.status(500).json({ erro: 'Erro ao processar solicitação de resgate' });
+  }
+});
+
+// GET /api/recompensas/pendentes — listar resgates pendentes do setor
+router.get('/pendentes', authSetor, async (req, res) => {
+  const { id: setor_id, empresa_id } = req.session.setor;
+  try {
+    const pendentes = await Resgate.find({ setor_id, empresa_id, status: 'pendente' })
+      .populate('recompensa_id', 'nome pontuacao_necessaria tipo')
+      .sort({ _id: -1 });
+    res.json(pendentes);
+  } catch (err) {
+    res.status(500).json({ erro: 'Erro ao buscar resgates pendentes' });
+  }
+});
+
+// PUT /api/recompensas/resgates/:id — aprovar ou cancelar resgate
+router.put('/resgates/:id', authSetor, async (req, res) => {
+  const { status } = req.body; // 'aprovado' ou 'cancelado'
+  const { id: setor_id, empresa_id } = req.session.setor;
+
+  if (!['aprovado', 'cancelado'].includes(status)) {
+    return res.status(400).json({ erro: 'Status inválido' });
+  }
+
+  try {
+    const resgate = await Resgate.findOneAndUpdate(
+      { _id: req.params.id, setor_id, empresa_id, status: 'pendente' },
+      { status },
+      { new: true }
+    );
+
+    if (!resgate) return res.status(404).json({ erro: 'Solicitação não encontrada ou já processada' });
+
+    res.json({ sucesso: true, mensagem: `Resgate ${status} com sucesso!` });
+  } catch (err) {
+    res.status(500).json({ erro: 'Erro ao atualizar status do resgate' });
   }
 });
 

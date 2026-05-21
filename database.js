@@ -167,6 +167,7 @@ const ResgateSchema = new mongoose.Schema({
     ref: "Recompensa",
     required: true,
   },
+  status: { type: String, default: "pendente" }, // pendente, aprovado, cancelado
   data_resgate: { type: String, required: true },
   empresa_id: {
     type: mongoose.Schema.Types.ObjectId,
